@@ -9,7 +9,6 @@ import cv2
 import numpy as np
 import torch
 from torch import nn, einsum
-from sklearn.metrics import plot_confusion_matrix
 
 from utils import get_method, check_correct, resize, shuffle_dataset, get_n_params
 import torch.nn as nn
