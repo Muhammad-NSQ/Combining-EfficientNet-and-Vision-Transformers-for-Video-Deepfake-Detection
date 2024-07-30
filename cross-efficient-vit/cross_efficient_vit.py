@@ -1,4 +1,3 @@
-
 import torch
 from torch import nn, einsum
 import torch.nn.functional as F
@@ -6,7 +5,48 @@ import cv2
 import numpy as np
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
-from efficient_net.efficientnet_pytorch import EfficientNet
+from efficientnet_pytorch import EfficientNet
+
+# Custom EfficientNet class
+class CustomEfficientNet(EfficientNet):
+    def __init__(self, blocks_args, global_params, blocks_to_delete=None):
+        super(CustomEfficientNet, self).__init__(blocks_args, global_params)
+        if blocks_to_delete is not None:
+            for block in blocks_to_delete:
+                self._blocks[block] = nn.Identity()
+        self._blocks_to_delete = blocks_to_delete
+
+    @classmethod
+    def from_pretrained(cls, model_name, blocks_to_delete=None):
+        model = super(CustomEfficientNet, cls).from_pretrained(model_name)
+        model._blocks_to_delete = blocks_to_delete
+        if blocks_to_delete is not None:
+            for block in blocks_to_delete:
+                model._blocks[block] = nn.Identity()
+        return model
+
+    def extract_features(self, inputs, block_num):
+        """ Use convolutional layer to extract feature map
+        Args:
+            inputs (tensor): Input tensor.
+        Returns:
+            Output of the final convolution 
+        """
+        # Stem
+        x = self._swish(self._bn0(self._conv_stem(inputs)))
+
+        # Blocks
+        for idx, block in enumerate(self._blocks):
+            if self._blocks_to_delete and idx in self._blocks_to_delete:
+                continue
+            x = block(x)
+            if idx == block_num:
+                break
+
+        # Head
+        x = self._swish(self._bn1(self._conv_head(x)))
+
+        return x
 
 # helpers
 
@@ -183,8 +223,7 @@ class ImageEmbedder(nn.Module):
     ):
         super().__init__()
         assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
-        self.efficient_net = EfficientNet.from_pretrained('efficientnet-b0')
-        self.efficient_net.delete_blocks(efficient_block)
+        self.efficient_net = CustomEfficientNet.from_pretrained('efficientnet-b7', blocks_to_delete=[efficient_block])
         self.efficient_block = efficient_block
         
         for index, (name, param) in enumerate(self.efficient_net.named_parameters()):
@@ -192,37 +231,21 @@ class ImageEmbedder(nn.Module):
                 
         self.patch_size = patch_size
         num_patches = (image_size // patch_size) ** 2
-        patch_dim = channels * patch_size ** 2
+        patch_dim = channels * patch_size * patch_size
         self.to_patch_embedding = nn.Sequential(
-            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1 = patch_size, p2 = patch_size),
-            nn.Linear(patch_dim, dim),
-        )
+         Rearrange('b c (h p1) (w p2) -> b (h w) (c p1 p2)', p1=1, p2=1),  # Adjust p1 and p2 to match the feature map size
+         nn.Linear(2560, dim),  # Match the input size to the reshaped feature map size
+)
       
         self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, img):
-        x = self.efficient_net.extract_features_at_block(img, self.efficient_block)
-        '''
-        x_scaled = []
-        for idx, im in enumerate(x):
-            im = im.cpu().detach().numpy()
-            for patch_idx, patch in enumerate(im):
-                patch = 2.*(patch - np.min(patch))/np.ptp(patch)-1
-                im[patch_idx] = patch
-               
-            x_scaled.append(im)
-        x = torch.tensor(x_scaled).cuda()    
-        '''
-        #x = torch.tensor(x).cuda()
-        '''
-        for idx, im in enumerate(x):
-            im = im.cpu().detach().numpy()
-            for patch_idx, patch in enumerate(im):
-                cv2.imwrite("patches/patches_"+str(idx)+"_"+str(patch_idx)+".png", patch)
-        '''
+        x = self.efficient_net.extract_features(img, self.efficient_block)
+        print(f'Feature map shape: {x.shape}')
         x = self.to_patch_embedding(x)
+        print(f'Patch embedding shape: {x.shape}')
         b, n, _ = x.shape
 
         cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)
@@ -230,6 +253,7 @@ class ImageEmbedder(nn.Module):
         x += self.pos_embedding[:, :(n + 1)]
 
         return self.dropout(x)
+
 
 # cross ViT class
 
@@ -263,10 +287,8 @@ class CrossEfficientViT(nn.Module):
         dropout = config['model']['dropout']
         emb_dropout = config['model']['emb-dropout']
 
-
-
-        self.sm_image_embedder = ImageEmbedder(dim = sm_dim, image_size = image_size, patch_size = sm_patch_size, dropout = emb_dropout, efficient_block = 16, channels=sm_channels)
-        self.lg_image_embedder = ImageEmbedder(dim = lg_dim, image_size = image_size, patch_size = lg_patch_size, dropout = emb_dropout, efficient_block = 1, channels=lg_channels)
+        self.sm_image_embedder = ImageEmbedder(dim = sm_dim, image_size = image_size, patch_size = sm_patch_size, dropout = emb_dropout, efficient_block = 10, channels=sm_channels)
+        self.lg_image_embedder = ImageEmbedder(dim = lg_dim, image_size = image_size, patch_size = lg_patch_size, dropout = emb_dropout, efficient_block = 30, channels=lg_channels)
 
         self.multi_scale_encoder = MultiScaleEncoder(
             depth = depth,
