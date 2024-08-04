@@ -10,17 +10,17 @@ training:
   frames-per-video: 30  # Equidistant frames
 
 model:
-  image-size: 448  # Ensure this is divisible by both patch sizes
+  image-size: 380  # Ensure this is divisible by both patch sizes
   num-classes: 1
   depth: 6  # Increase the number of multi-scale encoding blocks
   sm-dim: 384  # Adjust dimensions for higher capacity
-  sm-patch-size: 7  # Ensure this divides the image size without remainder
+  sm-patch-size: 10  # Ensure this divides the image size without remainder
   sm-enc-depth: 4  # Increase depth
   sm-enc-dim-head: 64
   sm-enc-heads: 8
   sm-enc-mlp-dim: 2048
   lg-dim: 768  # Adjust dimensions for higher capacity
-  lg-patch-size: 14  # Ensure this divides the image size without remainder
+  lg-patch-size: 20  # Ensure this divides the image size without remainder
   lg-enc-depth: 4
   lg-enc-dim-head: 64
   lg-enc-heads: 8
