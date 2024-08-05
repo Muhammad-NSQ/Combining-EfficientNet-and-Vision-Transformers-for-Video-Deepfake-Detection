@@ -32,7 +32,7 @@ import yaml
 import argparse
 from torch.cuda.amp import autocast, GradScaler
 
-BASE_DIR = 'E:/DF_dataset/deep_fakes/'
+BASE_DIR = '/root/scr/dataset'
 DATA_DIR = os.path.join(BASE_DIR, "dataset")
 TRAINING_DIR = os.path.join(DATA_DIR, "training_set")
 VALIDATION_DIR = os.path.join(DATA_DIR, "validation_set")
@@ -44,7 +44,7 @@ VALIDATION_LABELS_PATH = os.path.join(DATA_DIR, "dfdc_val_labels.csv")
 
 def read_frames(video_path, train_dataset, validation_dataset, image_size, config):
     # Determine the label based on the directory name
-    if "Original" in video_path:
+    if "original" in video_path:
         label = 0.
     elif "Face2Face" in video_path:
         label = 1.
@@ -134,9 +134,9 @@ if __name__ == "__main__":
    
     #READ DATASET
     if opt.dataset != "All":
-        folders = ["Original", opt.dataset]
+        folders = ["original", opt.dataset]
     else:
-        folders = ["Original", "Face2Face"]
+        folders = ["original", "Face2Face"]
 
     sets = [TRAINING_DIR, VALIDATION_DIR]
 
