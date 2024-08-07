@@ -32,7 +32,7 @@ import yaml
 import argparse
 from torch.cuda.amp import autocast, GradScaler
 
-BASE_DIR = 'E:/DF_dataset/deep_fakes/'
+BASE_DIR = '/root/src/dataset'
 DATA_DIR = os.path.join(BASE_DIR, "dataset")
 TRAINING_DIR = os.path.join(DATA_DIR, "training_set")
 VALIDATION_DIR = os.path.join(DATA_DIR, "validation_set")
