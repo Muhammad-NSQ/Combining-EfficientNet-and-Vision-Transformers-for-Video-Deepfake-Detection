@@ -1,0 +1,34 @@
+training:
+  lr: 0.001  # Reduced learning rate for more stable training
+  weight-decay: 0.00001  # Increased weight decay for better regularization
+  bs: 4  # Increased batch size for better gradient estimates
+  scheduler: 'steplr'
+  gamma: 0.1
+  step-size: 15
+  rebalancing-fake: 1.0  # Use all frames from fake videos
+  rebalancing-real: 1.0  # Use all frames from real videos
+  frames-per-video: 100  # Increased number of frames per video
+
+model:
+  image-size: 380  # Kept the same to ensure divisibility by patch sizes
+  num-classes: 1
+  depth: 6
+  sm-dim: 384
+  sm-patch-size: 10
+  sm-enc-depth: 4
+  sm-enc-dim-head: 64
+  sm-enc-heads: 8
+  sm-enc-mlp-dim: 2048
+  lg-dim: 768
+  lg-patch-size: 20
+  lg-enc-depth: 4
+  lg-enc-dim-head: 64
+  lg-enc-heads: 8
+  lg-enc-mlp-dim: 2048
+  cross-attn-depth: 4
+  cross-attn-dim-head: 64
+  cross-attn-heads: 8
+  lg-channels: 56
+  sm-channels: 2560
+  dropout: 0.3
+  emb-dropout: 0.3
