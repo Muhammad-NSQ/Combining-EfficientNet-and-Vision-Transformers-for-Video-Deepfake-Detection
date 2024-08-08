@@ -1,7 +1,7 @@
 training:
   lr: 0.001  # Reduced learning rate for more stable training
   weight-decay: 0.00001  # Increased weight decay for better regularization
-  bs: 4  # Increased batch size for better gradient estimates
+  bs: 32  # Increased batch size for better gradient estimates
   scheduler: 'steplr'
   gamma: 0.1
   step-size: 15
