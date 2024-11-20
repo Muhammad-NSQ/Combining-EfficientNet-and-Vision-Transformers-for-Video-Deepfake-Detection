@@ -32,7 +32,7 @@ import yaml
 import argparse
 from torch.cuda.amp import autocast, GradScaler
 
-BASE_DIR = '/root/scr/dataset'
+BASE_DIR = '/root/'
 DATA_DIR = os.path.join(BASE_DIR, "dataset")
 TRAINING_DIR = os.path.join(DATA_DIR, "training_set")
 VALIDATION_DIR = os.path.join(DATA_DIR, "validation_set")
