@@ -31,6 +31,9 @@ import math
 import yaml
 import argparse
 from torch.cuda.amp import autocast, GradScaler
+import csv
+from datetime import datetime
+import matplotlib.pyplot as plt
 
 BASE_DIR = '/root/'
 DATA_DIR = os.path.join(BASE_DIR, "dataset")
@@ -41,12 +44,74 @@ MODELS_PATH = "models"
 METADATA_PATH = os.path.join(BASE_DIR, "data/metadata") # Folder containing all training metadata for DFDC dataset
 VALIDATION_LABELS_PATH = os.path.join(DATA_DIR, "dfdc_val_labels.csv")
 
+class TrainingMonitor:
+    def __init__(self, model_name, save_dir="training_logs"):
+        self.model_name = model_name
+        self.save_dir = save_dir
+        self.train_losses = []
+        self.val_losses = []
+        self.train_accuracies = []
+        self.val_accuracies = []
+        
+        # Create directories if they don't exist
+        os.makedirs(save_dir, exist_ok=True)
+        os.makedirs(os.path.join(save_dir, 'plots'), exist_ok=True)
+        
+        # Initialize CSV file with headers
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.csv_path = os.path.join(save_dir, f'training_log_{timestamp}.csv')
+        with open(self.csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Epoch', 'Model_Checkpoint', 'Train_Loss', 'Val_Loss', 
+                           'Train_Accuracy', 'Val_Accuracy'])
+
+    def update(self, epoch, checkpoint_name, train_loss, val_loss, train_acc, val_acc):
+        # Store metrics
+        self.train_losses.append(train_loss)
+        self.val_losses.append(val_loss)
+        self.train_accuracies.append(train_acc)
+        self.val_accuracies.append(val_acc)
+        
+        # Save to CSV
+        with open(self.csv_path, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([epoch, checkpoint_name, train_loss, val_loss, train_acc, val_acc])
+        
+        # Plot and save graphs
+        self._plot_metrics()
+    
+    def _plot_metrics(self):
+        plt.figure(figsize=(15, 5))
+        
+        # Loss plot
+        plt.subplot(1, 2, 1)
+        plt.plot(self.train_losses, label='Training Loss', marker='o')
+        plt.plot(self.val_losses, label='Validation Loss', marker='o')
+        plt.title(f'{self.model_name} - Loss over Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        
+        # Accuracy plot
+        plt.subplot(1, 2, 2)
+        plt.plot(self.train_accuracies, label='Training Accuracy', marker='o')
+        plt.plot(self.val_accuracies, label='Validation Accuracy', marker='o')
+        plt.title(f'{self.model_name} - Accuracy over Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.legend()
+        plt.grid(True)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.save_dir, 'plots', f'{self.model_name}_training_plots.png'))
+        plt.close()
 
 def read_frames(video_path, train_dataset, validation_dataset, image_size, config):
     # Determine the label based on the directory name
     if "original" in video_path:
         label = 0.
-    elif "Face2Face" in video_path:
+    elif "Face2Face" or "FaceShifter" or "FaceSwap" in video_path:
         label = 1.
     else:
         raise ValueError(f"Unknown directory {video_path}")
@@ -132,6 +197,8 @@ if __name__ == "__main__":
 
     print("Model Parameters:", get_n_params(model))
    
+    monitor = TrainingMonitor(model_name=f"EfficientNet_{opt.dataset}")
+    
     #READ DATASET
     if opt.dataset != "All":
         folders = ["original", opt.dataset]
@@ -285,10 +352,20 @@ if __name__ == "__main__":
             not_improved_loss = 0
         
         previous_loss = total_val_loss
+        
+        checkpoint_name = f"efficientnet_checkpoint{t}_{opt.dataset}"
+        monitor.update(
+            epoch=t,
+            checkpoint_name=checkpoint_name,
+            train_loss=total_loss,
+            val_loss=total_val_loss,
+            train_acc=train_correct,
+            val_acc=val_correct
+        )
+
         print("#" + str(t) + "/" + str(opt.num_epochs) + " loss:" +
             str(total_loss) + " accuracy:" + str(train_correct) +" val_loss:" + str(total_val_loss) + " val_accuracy:" + str(val_correct) + " val_0s:" + str(val_negative) + "/" + str(np.count_nonzero(validation_labels == 0)) + " val_1s:" + str(val_positive) + "/" + str(np.count_nonzero(validation_labels == 1)))
 
-        
         if not os.path.exists(MODELS_PATH):
             os.makedirs(MODELS_PATH)
-        torch.save(model.state_dict(), os.path.join(MODELS_PATH,  "efficientnet_checkpoint" + str(t) + "_" + opt.dataset))
+        torch.save(model.state_dict(), os.path.join(MODELS_PATH, checkpoint_name))
